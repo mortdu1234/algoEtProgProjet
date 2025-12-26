@@ -1,6 +1,8 @@
 from enum import Enum
 import random
+from turtle import back
 from matplotlib.figure import Figure
+from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -11,6 +13,10 @@ class MazeColor(Enum):
     START = (0, 255, 0)
     EXPLORATION = (255, 255, 0)
     BEST_PATH = (0, 255, 255)
+    BEST_FINISH = (255, 0, 0)
+
+    def convert_to_hexa(self):
+        return "#" + "".join(f"{i:02x}" for i in self.value)
 
 class Maze:
     def __init__(self, size: int, seed: int = 0):
@@ -28,6 +34,7 @@ class Maze:
         self.__generate_maze()
         self.__generate_dijkstra()
         self.__generate_dimentionnal_map()
+        self.initial_maze = self.pixels_map.copy()
 
     
     def get_voisins(self, x: int, y: int) -> list[tuple[int, int]]:
@@ -197,35 +204,142 @@ class Maze:
         assert(0 <= x < self.size and 0 <= y < self.size), f"Coordonnées hors limites: 0 <= {x} < {self.size}, 0 <= {y} < {self.size}"
         self.pixels_map[x][y] = MazeColor.WALL
 
-    def set_path(self, path: list[tuple[int, int]], color: MazeColor) -> Figure:
-        """Crée une figure isolée avec le chemin coloré"""
-        # Créer une copie profonde de la map pour ne pas modifier l'original
-        pixel_map = [row[:] for row in self.pixels_map]
+    def set_path(self, path: list[tuple[int, int]], path_color: MazeColor, stop_color: MazeColor, title:str="", show_image:bool=False) -> Figure:
+        """Crée une figure isolée avec le chemin coloré""" 
+        fig = plt.figure(figsize=(8, 8))
+        ax = fig.add_subplot(111)
+        color = path_color.convert_to_hexa()
+        end_color = stop_color.convert_to_hexa()
+
+        pixel_map = [row[:] for row in self.initial_maze]
         
-        for x, y in path:
-            pixel_map[x][y] = color
-        
-        # Convertir en tableau RGB pour l'affichage
-        import numpy as np
         rgb_array = np.zeros((self.size, self.size, 3), dtype=np.uint8)
         for i in range(self.size):
             for j in range(self.size):
                 rgb_array[i][j] = pixel_map[i][j].value
         
-        # Créer une figure complètement isolée
-        fig = plt.figure(figsize=(8, 8))
-        ax = fig.add_subplot(111)
+        for x, y in path:
+            ax.plot(y, x, 'X', color=color, markersize=10)
+        ax.plot(y, x, 'o', color=end_color, markersize=10)
+        
+        
         ax.imshow(rgb_array)
-        ax.set_title("Path Map")
+        ax.set_title(title)
         ax.axis('off')
         fig.tight_layout()
         
+        if show_image:
+            fig.show()
+
         return fig
 
+    def get_fig_explored_phase_map(self, title: str="", show_values: bool=True, show_image: bool=True) -> Figure:        
 
-
-    def get_fig_explored_phase_map(self, title: str="", show_values: bool=True, show_image: bool=True) -> Figure:
+        
         tab_np = np.array(self.explored_phase_map)
+        
+        # Convertir pixels_map en RGB
+        background = np.zeros((self.size, self.size, 3), dtype=np.uint8)
+        for i in range(self.size):
+            for j in range(self.size):
+                background[i][j] = self.pixels_map[i][j].value
+        
+        fig, ax = plt.subplots(figsize=(8, 8)) 
+        
+        # Afficher le labyrinthe en fond
+        ax.imshow(background, interpolation='nearest')
+        
+        # Créer un masque pour les cases PATH (blanches = 255, 255, 255)
+        is_path = np.all(background == MazeColor.PATH.value, axis=-1)
+        
+        # Masquer les cases qui ne sont pas PATH OU qui ont la valeur 0
+        masked_data = np.ma.masked_where(~is_path | (tab_np == 0), tab_np)
+        
+        # Appliquer la colormap viridis uniquement sur les cases PATH avec valeur > 0
+        cmap = plt.cm.viridis
+        cmap.set_bad(alpha=0)  # Rendre transparent les zones masquées
+        
+        # Utiliser une échelle logarithmique si des valeurs > 0 existent
+        if masked_data.max() > 0:
+            im = ax.imshow(masked_data, cmap=cmap, interpolation='nearest', 
+                        alpha=0.7, norm=LogNorm(vmin=masked_data.min(), vmax=masked_data.max()))
+            fig.colorbar(im, ax=ax, label='Exploration (log scale)') 
+        else:
+            # Si toutes les valeurs sont 0, pas de colormap
+            im = ax.imshow(masked_data, cmap=cmap, interpolation='nearest', alpha=0.7)
+            fig.colorbar(im, ax=ax, label='Exploration') 
+        
+        if show_values:
+            for i in range(self.size):
+                for j in range(self.size):
+                    if is_path[i, j] and tab_np[i, j] > 0:  # Afficher uniquement si PATH et > 0
+                        text = ax.text(j, i, tab_np[i, j],
+                                    ha="center", va="center",
+                                    color="purple",
+                                    fontsize=12, weight='bold')
+        
+        ax.set_title(title)
+        ax.axis('off')
+        
+        if show_image:
+            plt.show()
+        
+        return fig
+
+    def get_fig_explored_full_map(self, title: str="", show_values: bool=True, show_image: bool=True) -> Figure:        
+        
+        tab_np = np.array(self.explored_map)
+        
+        # Convertir pixels_map en RGB
+        background = np.zeros((self.size, self.size, 3), dtype=np.uint8)
+        for i in range(self.size):
+            for j in range(self.size):
+                background[i][j] = self.pixels_map[i][j].value
+        
+        fig, ax = plt.subplots(figsize=(8, 8)) 
+        
+        # Afficher le labyrinthe en fond
+        ax.imshow(background, interpolation='nearest')
+        
+        # Créer un masque pour les cases PATH (blanches = 255, 255, 255)
+        is_path = np.all(background == MazeColor.PATH.value, axis=-1)
+        
+        # Masquer les cases qui ne sont pas PATH OU qui ont la valeur 0
+        masked_data = np.ma.masked_where(~is_path | (tab_np == 0), tab_np)
+        
+        # Appliquer la colormap viridis uniquement sur les cases PATH avec valeur > 0
+        cmap = plt.cm.viridis
+        cmap.set_bad(alpha=0)  # Rendre transparent les zones masquées
+        
+        # Utiliser une échelle logarithmique si des valeurs > 0 existent
+        if masked_data.max() > 0:
+            im = ax.imshow(masked_data, cmap=cmap, interpolation='nearest', 
+                        alpha=0.7, norm=LogNorm(vmin=masked_data.min(), vmax=masked_data.max()))
+            fig.colorbar(im, ax=ax, label='Exploration (log scale)') 
+        else:
+            # Si toutes les valeurs sont 0, pas de colormap
+            im = ax.imshow(masked_data, cmap=cmap, interpolation='nearest', alpha=0.7)
+            fig.colorbar(im, ax=ax, label='Exploration') 
+        
+        if show_values:
+            for i in range(self.size):
+                for j in range(self.size):
+                    if is_path[i, j] and tab_np[i, j] > 0:  # Afficher uniquement si PATH et > 0
+                        text = ax.text(j, i, tab_np[i, j],
+                                    ha="center", va="center",
+                                    color="purple",
+                                    fontsize=12, weight='bold')
+        
+        ax.set_title(title)
+        ax.axis('off')
+        
+        if show_image:
+            plt.show()
+        
+        return fig
+
+    def get_fig_dijkstra_map(self, title: str="", show_values: bool=True, show_image: bool=True) -> Figure:        
+        tab_np = np.array(self.dijkstra_map)
         tab_mask = np.ma.masked_where(tab_np == -1, tab_np)
 
         fig, ax = plt.subplots(figsize=(8, 8)) 
@@ -233,131 +347,93 @@ class Maze:
         cmap.set_bad(color="black")
 
 
-        if show_image:
-            im = ax.imshow(tab_mask, cmap=cmap, interpolation='nearest')
+        im = ax.imshow(tab_mask, cmap=cmap, interpolation='nearest')
         
 
         if show_values:
             fig.colorbar(im, ax=ax, label='Exploration')
             for i in range(self.size):
                 for j in range(self.size):
-                    text = ax.text(j, i, tab_np[i, j],
-                        ha="center", va="center",
-                        color="white" if tab_np[i, j] == -1 else "black",
-                        fontsize=12, weight='bold')
-        
+                    if tab_np[i, j] != -1:
+                        text = ax.text(j, i, tab_np[i, j],
+                            ha="center", va="center",
+                            color="purple",
+                            fontsize=12, weight='bold')
+            
         ax.set_title(title)
+        ax.axis('off')
+        
+        if show_image:
+            fig.show()
 
         return fig
 
-
-
-
-    def get_fig_exploration_map(self, name: str = "Explored Map") -> tuple[Figure, Figure]:
-        """Retourne les figures matplotlib de la map explorée (phase et full)"""
-        
-        ###########################################
-        # EXPLORED PHASE MAP
-        ###########################################
-        fig_explored_phase = plt.figure(figsize=(8, 8))
-        ax_phase = fig_explored_phase.add_subplot(111)
-        
-        # Créer une copie pour éviter les références
-        phase_data = np.array(self.explored_phase_map, dtype=float)
-        im_phase = ax_phase.imshow(phase_data, cmap='viridis', interpolation='nearest')
-        ax_phase.set_title(f"{name} - Phase")
-        fig_explored_phase.colorbar(im_phase, ax=ax_phase)
-        fig_explored_phase.tight_layout()
-        
-        ###########################################
-        # EXPLORED FULL MAP
-        ###########################################
-        fig_explored_full = plt.figure(figsize=(8, 8))
-        ax_full = fig_explored_full.add_subplot(111)
-        
-        # Créer une copie pour éviter les références
-        full_data = np.array(self.explored_map, dtype=float)
-        im_full = ax_full.imshow(full_data, cmap='hot', interpolation='nearest')
-        ax_full.set_title(f"{name} - Full")
-        fig_explored_full.colorbar(im_full, ax=ax_full)
-        fig_explored_full.tight_layout()
-        
-        return (fig_explored_phase, fig_explored_full)
-
-    def get_fig_of_maze(self) -> tuple[Figure, Figure, Figure]:
-        """Renvois les figures matplotlib du labyrinthe (isolées)"""
-        
-        ###########################################
-        # PIXELS MAP
-        ###########################################
+    def get_fig_pixel_map(self, title: str="", show_image: bool=True) -> Figure:
         fig_pixels_map = plt.figure(figsize=(8, 8))
         ax_pixels = fig_pixels_map.add_subplot(111)
         
         # Convertir la map en RGB
-        rgb_array = np.zeros((self.size, self.size, 3), dtype=np.uint8)
+        tab_np = np.zeros((self.size, self.size, 3), dtype=np.uint8)
         for i in range(self.size):
             for j in range(self.size):
-                rgb_array[i][j] = self.pixels_map[i][j].value
+                tab_np[i][j] = self.pixels_map[i][j].value
         
-        ax_pixels.imshow(rgb_array)
-        ax_pixels.set_title("Pixels Map")
+        ax_pixels.imshow(tab_np)
+
+        ax_pixels.set_title(title)
         ax_pixels.axis('off')
-        fig_pixels_map.tight_layout()
+        fig_pixels_map.tight_layout()  
 
-        ###########################################
-        # DIJKSTRA MAP
-        ###########################################
-        fig_dijkstra_map = plt.figure(figsize=(8, 8))
-        ax_dijkstra = fig_dijkstra_map.add_subplot(111)
         
-        # Créer une copie et masquer les murs (-1)
-        dijkstra_data = np.array(self.dijkstra_map, dtype=float)
-        dijkstra_data[dijkstra_data == -1] = np.nan
-        
-        im_dijkstra = ax_dijkstra.imshow(dijkstra_data, cmap='viridis', interpolation='nearest')
-        
-        # Ajout des valeurs uniquement pour petit labyrinthe
-        if self.size <= 20:
-            for i in range(self.size):
-                for j in range(self.size):
-                    value = self.dijkstra_map[i][j]
-                    if value != -1:
-                        ax_dijkstra.text(j, i, f'{int(value)}',
-                                ha='center', va='center',
-                                color='white', fontsize=8, fontweight='bold')
+        if show_image:
+            fig_pixels_map.show()
 
-        ax_dijkstra.set_title('Carte Dijkstra')
-        fig_dijkstra_map.colorbar(im_dijkstra, ax=ax_dijkstra)
-        fig_dijkstra_map.tight_layout()
-
-        ###########################################
-        # DIMENTION MAP
-        ###########################################
-        fig_dimention_map = plt.figure(figsize=(8, 8))
-        ax_dimention = fig_dimention_map.add_subplot(111)
-        
-        # Créer une image RGB: noir pour les murs, blanc pour les chemins
-        dimention_rgb = np.ones((self.size, self.size, 3), dtype=np.uint8) * 255  # Blanc par défaut
-        
+        return fig_pixels_map
+    
+    def get_fig_dimention_map(self, title: str="", show_values: bool=True, show_image:bool=True) -> Figure:
+        fig = plt.figure(figsize=(8, 8))
+        ax = fig.add_subplot(111)
+        tab_np = np.zeros((self.size, self.size, 3), dtype=np.uint8)
         for i in range(self.size):
             for j in range(self.size):
-                if self.dimention_map[i][j] == -1:
-                    dimention_rgb[i][j] = [0, 0, 0]  # Noir pour les murs
+                tab_np[i][j] = self.pixels_map[i][j].value
+
         
-        ax_dimention.imshow(dimention_rgb, interpolation='nearest')
+        im = ax.imshow(tab_np, interpolation='nearest')
         
-        # Ajout des valeurs uniquement pour petit labyrinthe
-        if self.size <= 20:
+
+        if show_values:
+            dimention_np = np.array(self.dimention_map)
             for i in range(self.size):
                 for j in range(self.size):
-                    value = self.dimention_map[i][j]
-                    if value != -1:
-                        ax_dimention.text(j, i, f'{int(value)}',
-                                ha='center', va='center',
-                                color='black', fontsize=8, fontweight='bold')
-            
-        ax_dimention.set_title("Carte Dimention")
-        ax_dimention.axis('off')  # Suppression des graduations
-        fig_dimention_map.tight_layout()
+                    if dimention_np[i, j] != -1:
+                        text = ax.text(j, i, dimention_np[i, j],
+                            ha="center", va="center",
+                            color="purple",
+                            fontsize=12, weight='bold')
 
-        return fig_pixels_map, fig_dijkstra_map, fig_dimention_map
+
+        ax.set_title(title)
+        ax.axis('off')
+
+        if show_image:
+            fig.show()
+        return fig
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

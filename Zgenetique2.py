@@ -1,3 +1,4 @@
+from turtle import pen
 from matplotlib.figure import Figure
 from Zmaze_maker2 import Maze, MazeColor
 from random import randint as rdm   
@@ -5,11 +6,70 @@ import random
 import matplotlib.pyplot as plt
 import time
 import numpy as np
+import os
+from Zlogs import Logs
 
-
-from logs import Logs
+os.makedirs("logs", exist_ok=True)
+os.makedirs("logs/explorations", exist_ok=True)
 
 LOGGER = Logs()
+
+import matplotlib.pyplot as plt
+
+def fusionner_figures_horizontale(fig1, fig2):
+    """
+    Fusionne deux figures matplotlib horizontalement
+    avec tailles cohérentes et légendes correctes.
+    """
+    new_fig, axes = plt.subplots(
+        1, 2,
+        figsize=(
+            fig1.get_figwidth() + fig2.get_figwidth(),
+            max(fig1.get_figheight(), fig2.get_figheight())
+        )
+    )
+
+    for src_fig, target_ax in zip([fig1, fig2], axes):
+        src_ax = src_fig.axes[0]  # hypothèse : 1 axe par figure
+
+        # Lignes
+        for line in src_ax.get_lines():
+            target_ax.plot(
+                line.get_xdata(),
+                line.get_ydata(),
+                label=line.get_label(),
+                color=line.get_color(),
+                linestyle=line.get_linestyle(),
+                linewidth=line.get_linewidth(),
+                marker=line.get_marker()
+            )
+
+        # Images (imshow)
+        for img in src_ax.images:
+            target_ax.imshow(
+                img.get_array(),
+                extent=img.get_extent(),
+                origin=img.origin,
+                cmap=img.get_cmap(),
+                alpha=img.get_alpha(),
+                aspect = src_ax.get_aspect()
+
+            )
+
+        # Propriétés
+        target_ax.set_xlim(src_ax.get_xlim())
+        target_ax.set_ylim(src_ax.get_ylim())
+        target_ax.set_title(src_ax.get_title())
+        target_ax.set_xlabel(src_ax.get_xlabel())
+        target_ax.set_ylabel(src_ax.get_ylabel())
+
+        # Légende CORRECTE
+        handles, labels = src_ax.get_legend_handles_labels()
+        if labels:
+            target_ax.legend(handles, labels)
+
+    plt.tight_layout()
+    return new_fig
 
 class Population:
     """Gestion de la population
@@ -109,51 +169,49 @@ class Population:
         self.scores_avg.append(sum(scores) / len(scores)) # type: ignore
         self.scores_max.append(max(scores)) # type: ignore
 
-    def simulation(self):
-        LOGGER.log_new("test")
+    def simulation(self, picture_each_x_generation=10):
 
         self.calcul_fitness()
         self.tri_individue()
-
+        LOGGER.write("DEBUT\n\n\n")
         print("Début de la simulation génétique...")
         s2 = time.perf_counter()
         cpt = 0
         for i in range(Population.NOMBRE_GENERATION):
             self.note_statistiques()
+
             self.selection()
+            assert len(self.individues) == (Population.NOMBRE_INDIVIDUES*Population.TAUX_GARDEE), f"{len(self.individues)} il manque du monde"
             self.reproduction()
+            assert len(self.individues) == (Population.NOMBRE_INDIVIDUES), f"{len(self.individues)} il manque du monde"
             self.mutation()
+            assert len(self.individues) == (Population.NOMBRE_INDIVIDUES), f"{len(self.individues)} il manque du monde"
             self.calcul_fitness()
+            assert len(self.individues) == (Population.NOMBRE_INDIVIDUES), f"{len(self.individues)} il manque du monde"
+            
+            self.add_explorations()
             self.tri_individue()
             self.affichage_barre_progression(i+1)
             
             cpt += 1
-            nb_generation = 10
-            if cpt % nb_generation == 0:  
-                fig1 = self.maze.get_fig_exploration_map(f"Explored Map {i-nb_generation+1}-{i}")[0]
-                fig2 = self.maze.set_path(self.individues[0].get_path(self.maze), MazeColor.BEST_PATH)
-                
+            nb_generation = picture_each_x_generation
+            if cpt % nb_generation == 0:
+                fig1 = self.maze.get_fig_explored_phase_map(title=f"Explored Map {i-nb_generation+1}-{i}", show_image=False, show_values=True)
+                fig1.savefig(f"logs/explorations/{i-nb_generation+1}-{i}_explored.png")
+            
+                fig2 = self.maze.set_path(self.individues[0].get_path(self.maze), MazeColor.BEST_PATH, MazeColor.BEST_FINISH)
+                fig2.savefig(f"logs/explorations/{i-nb_generation+1}-{i}_best_path.png")  
 
-                fig_combined = merge_figures(
-                    fig1, 
-                    fig2, 
-                    titles=(f"Explored Map {i}", "Best Path")
-                )
+                fig3 = fusionner_figures_horizontale(fig1, fig2)
+                fig3.savefig(f"logs/explorations/{i-nb_generation+1}-{i}.png")  
 
-                fig_combined.savefig(f'logs/exploration/maze_comparison_{i-nb_generation+1}_{i}.png', dpi=300, bbox_inches='tight')
-                
-
+                LOGGER.write(f"bestpath {i-nb_generation+1}-{i}: {len(self.individues[0].get_path(self.maze))}: {self.individues[0].score}\n{LOGGER.zip_path(self.individues[0].get_path(self.maze))}") 
+                LOGGER.write(f"\t{self.individues[0].scoreExplication}")
+                LOGGER.write("\n\n")
 
 
         e2 = time.perf_counter()
         print(f"\nTemps total de la simulation : {e2 - s2:.0f}s")
-
-        LOGGER.log_summary_stats(self.scores_min, self.scores_avg, self.scores_max)
-        LOGGER.log_plot_statistics(self.scores_min, self.scores_avg, self.scores_max)
-        LOGGER.log_plot_convergence_rate(self.scores_min)
-        LOGGER.log_plot_loss(self.scores_min, self.scores_avg, self.scores_max)    
-        LOGGER.log_save()
-
         print("\nSimulation terminée.")
         
         
@@ -161,9 +219,9 @@ class Population:
             
 
     def calcul_fitness(self):
+        assert len(self.individues) == Population.NOMBRE_INDIVIDUES, 'il manque du monde'
         for individu in self.individues:
-            if individu.score is None:
-                individu.fitness(self.maze)
+            individu.fitness(self.maze)
 
     def tri_individue(self):
         """effectue un tri des individues de celui qui as le score le plus faible a celui qui a le score le plus grand
@@ -183,6 +241,11 @@ class Population:
             enfants.append(Individue.fusion(parent1, parent2))
         self.individues.extend(enfants)
         
+    def add_explorations(self):
+        for indiv in self.individues:
+            path = indiv.get_path(self.maze)
+            for x, y in path:
+                self.maze.add_exploration(x, y)
     
     def mutation(self):
         nb_mutant = round(Population.NOMBRE_INDIVIDUES * Population.TAUX_MUTATION) # nombre de mutant
@@ -236,6 +299,17 @@ class Individue:
         self.mouvements: 'list[int]' = mouvements_effectues
         self.start_point: tuple[int, int] = start_point
         self.score: int | None = None
+        self.penalities = {
+            "sortie de terrain": 1,
+            "foncer dans un mur": 1,
+            "bonus d'arrivee": 1,
+            "position final": 3,
+            "retour en arriere": 1,
+        }
+        self.counter = {key:0 for key in self.penalities}
+
+
+
 
     def length(self) -> int:
         """renvoie la longueur du chemin de l'individue
@@ -256,15 +330,25 @@ class Individue:
         """
         path = [self.start_point]
         for move in self.mouvements:
-            last_pos = path[-1]
+            last_x, last_y = path[-1]
             add = Individue.TEMPLATE_MOVE[move]
-            next_x, next_y = last_pos[0]+add[0], last_pos[1]+add[1]
-            if 0 > next_x or next_x >= maze.size or 0 > next_y or next_y >= maze.size: 
-                next_x, next_y = last_pos
+            next_x, next_y = last_x+add[0], last_y+add[1]
+            # print(f"mouvement {move} from {last_x} {last_y} to {next_x} {next_y}", end=" ")
+
+            if not(0 <= next_x < maze.size) or not(0 <= next_y < maze.size):
+                # print(f"\nOutOfBand {next_x} {next_y}")
+                next_x = last_x
+                next_y = last_y
+            # print(f"valueNext {maze.get_pixels(next_x, next_y)[0]}")
             
-            elif maze.get_pixels(next_x, next_y) == MazeColor.WALL:
-                next_x, next_y = last_pos
-                
+            if maze.get_pixels(next_x, next_y)[0] == MazeColor.WALL:
+                # print(f"Wall {next_x} {next_y}")
+                next_x = last_x
+                next_y = last_y
+
+
+
+            
             path.append((next_x, next_y))
 
         return path
@@ -319,35 +403,73 @@ class Individue:
 
     def fitness(self, maze: 'Maze') -> int:
         """Calcule le score de fitness de l'individu"""
-        score = 0
         x, y = self.start_point
-        self.place_pheromone(maze)
-        penalities = {
-            "sortie de terrain": 10,
-            "foncer dans un mur": 10,
-            "bonus d'arrivee": 0,
-            "position final": 1,
-        }
         
-
+        visited = [(x, y)]
         for step in self.mouvements:
-            maze.add_exploration(x, y)
-            next_pos = (x+Individue.TEMPLATE_MOVE[step][0], y+Individue.TEMPLATE_MOVE[step][1])
             # print(f"move : {step} => {Individue.TEMPLATE_MOVE[step]}")
+            last_x, last_y = visited[-1]
+            add = Individue.TEMPLATE_MOVE[step]
+            next_x, next_y = last_x+add[0], last_y+add[1]
 
-            if not(0 <= next_pos[0] < maze.size and 0 <= next_pos[1] < maze.size):
-                # le robot sort du labyrinthe
-                score += penalities["sortie de terrain"]
-                next_pos = (x, y)
-            elif maze.get_pixels(x, y)[0] == MazeColor.WALL:
-                score += penalities["foncer dans un mur"]
-                next_pos = (x, y)
-            elif (x, y) == maze.end_coords:
-                score += penalities["bonus d'arrivee"]
+            if not(0 <= next_x < maze.size) or not(0 <= next_y < maze.size):
+                next_x = last_x
+                next_y = last_y
+                self.counter["sortie de terrain"] += 1
+            # print(f"valueNext {maze.get_pixels(next_x, next_y)[0]}")
             
-            x, y = next_pos
+            if maze.get_pixels(next_x, next_y)[0] == MazeColor.WALL:
+                # print(f"Wall {next_x} {next_y}")
+                next_x = last_x
+                next_y = last_y
+                self.counter["foncer dans un mur"] += 1
+
+            if (last_x, last_y) == maze.end_coords:
+                self.counter["bonus d'arrivee"] = 1
+            
+            if (next_x, next_y) in visited and (next_x, next_y) != (last_x, last_y):
+                self.counter["retour en arriere"] += 1
+
+
+            last_x, last_y = next_x, next_y
+            visited.append((last_x, last_y))
         
-        self.score = score + penalities["position final"]
+        assert visited == self.get_path(maze), f"il y a un problemes de path\n{visited}\n{self.get_path(maze)}"
+    
+
+        explication = ""
+        self.counter["position final"] = maze.get_pixels(last_x, last_y)[1]
+        assert self.counter["position final"] != -1, f"probleme de coordonnée dijkstra, {self.counter['position final']} valeur négative {last_x} {last_y}\n{self.get_path(maze)}\n{visited}"
+        
+        self.score = 0
+        
+        key = "position final"
+        self.score += self.counter[key] ** self.penalities[key]
+        explication += f"{self.counter[key]} ** {self.penalities[key]} + "
+
+        key = "sortie de terrain"
+        self.score += self.penalities[key] * self.counter[key]
+        explication += f"{self.penalities[key]} * {self.counter[key]} + "
+        
+        key = "foncer dans un mur"
+        self.score += self.penalities[key] * self.counter[key]
+        explication += f"{self.penalities[key]} * {self.counter[key]} + "
+        
+        key = "bonus d'arrivee"
+        self.score += self.penalities[key] * self.counter[key]
+        explication += f"{self.penalities[key]} * {self.counter[key]} + "
+        
+        key = "retour en arriere"
+        self.score += self.penalities[key] * self.counter[key]
+        explication += f"{self.penalities[key]} * {self.counter[key]} "
+        
+
+        explication += f"= {self.score}"
+        self.scoreExplication = explication
+        # LOGGER.write(f"{visited} => {last_x} {last_y} : {maze.get_pixels(last_x, last_y)[1]} | {explication}")
+        
+        
+        self.place_pheromone(maze)
         return self.score
 
 
