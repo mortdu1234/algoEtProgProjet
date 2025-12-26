@@ -173,7 +173,6 @@ class Population:
 
         self.calcul_fitness()
         self.tri_individue()
-        LOGGER.write("DEBUT\n\n\n")
         print("Début de la simulation génétique...")
         s2 = time.perf_counter()
         cpt = 0
@@ -205,9 +204,7 @@ class Population:
                 fig3 = fusionner_figures_horizontale(fig1, fig2)
                 fig3.savefig(f"logs/explorations/{i-nb_generation+1}-{i}.png")  
 
-                LOGGER.write(f"bestpath {i-nb_generation+1}-{i}: {len(self.individues[0].get_path(self.maze))}: {self.individues[0].score}\n{LOGGER.zip_path(self.individues[0].get_path(self.maze))}") 
-                LOGGER.write(f"\t{self.individues[0].scoreExplication}")
-                LOGGER.write("\n\n")
+                LOGGER.write_generation(self.maze, self.individues[0], i, i-nb_generation+1)
 
 
         e2 = time.perf_counter()
@@ -248,15 +245,15 @@ class Population:
                 self.maze.add_exploration(x, y)
     
     def mutation(self):
-        nb_mutant = round(Population.NOMBRE_INDIVIDUES * Population.TAUX_MUTATION) # nombre de mutant
+        nb_mutant = round(Population.NOMBRE_INDIVIDUES * Population.TAUX_GARDEE * Population.TAUX_MUTATION) # nombre de mutant
         nb_mutation = 1 # nombre de mutation par mutant
         idx_mutants = []
 
         for _ in range(nb_mutant):
             # selection du mutant
-            idx_mutant = random.randint(0, Population.NOMBRE_INDIVIDUES-1)
+            idx_mutant = random.randint(round(Population.NOMBRE_INDIVIDUES * Population.TAUX_GARDEE), Population.NOMBRE_INDIVIDUES-1)
             while idx_mutant in idx_mutants:
-                idx_mutant = random.randint(0, Population.NOMBRE_INDIVIDUES-1)
+                idx_mutant = random.randint(round(Population.NOMBRE_INDIVIDUES * Population.TAUX_GARDEE), Population.NOMBRE_INDIVIDUES-1)
                 # print(idx_mutant, idx_mutants)
             idx_mutants.append(idx_mutant)
             mutant : Individue = self.individues[idx_mutant]
@@ -283,10 +280,21 @@ class Population:
 class Individue:
     TEMPLATE_MOVE = [(0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1), (1, 0), (1, 1)] # liste des mouvements possibles
     CUT_OFFSET = 0.05 # % d'offset du cut autour du milieux
+    PENALITES = None
     @staticmethod
     def set_offset(offset: float):
         assert isinstance(offset, float) and 0 <= offset <= 1
         Individue.CUT_OFFSET = offset
+    @staticmethod
+    def set_penalite(maze: 'Maze'):
+        Individue.PENALITES = {
+            "sortie de terrain": 1,
+            "foncer dans un mur": 1,
+            # "bonus d'arrivee": -maze.get_pixels(maze.start_coords[0], maze.start_coords[1])[1],
+            "bonus d'arrivee": 0,
+            "position final": 3,
+            "retour en arriere": 1,
+        }
 
 
     def __init__(self, mouvements_effectues: 'list[int]', start_point: 'tuple[int, int]'):
@@ -296,17 +304,13 @@ class Individue:
             mouvements_effectues (list[int]): liste des mouvements effectuer par l'individue
             start_point (tuple[int, int]): point de départ de l'individue
         """
+        assert Individue.PENALITES is not None, "il faut configurer les pénalités"
         self.mouvements: 'list[int]' = mouvements_effectues
         self.start_point: tuple[int, int] = start_point
         self.score: int | None = None
-        self.penalities = {
-            "sortie de terrain": 1,
-            "foncer dans un mur": 1,
-            "bonus d'arrivee": 1,
-            "position final": 3,
-            "retour en arriere": 1,
-        }
-        self.counter = {key:0 for key in self.penalities}
+        self.penalities = Individue.PENALITES
+        self.counter = {key:0 for key in Individue.PENALITES}
+        self.path = None
 
 
 
@@ -328,6 +332,8 @@ class Individue:
         Returns:
             list[tuple[int, int]]: liste des coordonnées visités
         """
+        if self.path is not None:
+            return self.path
         path = [self.start_point]
         for move in self.mouvements:
             last_x, last_y = path[-1]
@@ -350,7 +356,7 @@ class Individue:
 
             
             path.append((next_x, next_y))
-
+        self.path = path
         return path
     
     def place_pheromone(self, maze: 'Maze'):
@@ -404,6 +410,7 @@ class Individue:
     def fitness(self, maze: 'Maze') -> int:
         """Calcule le score de fitness de l'individu"""
         x, y = self.start_point
+        self.counter = {key:0 for key in Individue.PENALITES}
         
         visited = [(x, y)]
         for step in self.mouvements:
@@ -444,24 +451,24 @@ class Individue:
         self.score = 0
         
         key = "position final"
-        self.score += self.counter[key] ** self.penalities[key]
-        explication += f"{self.counter[key]} ** {self.penalities[key]} + "
+        self.score += self.counter[key] ** Individue.PENALITES[key]
+        explication += f"{self.counter[key]} ** {Individue.PENALITES[key]} + "
 
         key = "sortie de terrain"
-        self.score += self.penalities[key] * self.counter[key]
-        explication += f"{self.penalities[key]} * {self.counter[key]} + "
+        self.score += Individue.PENALITES[key] * self.counter[key]
+        explication += f"{Individue.PENALITES[key]} * {self.counter[key]} + "
         
         key = "foncer dans un mur"
-        self.score += self.penalities[key] * self.counter[key]
-        explication += f"{self.penalities[key]} * {self.counter[key]} + "
+        self.score += Individue.PENALITES[key] * self.counter[key]
+        explication += f"{Individue.PENALITES[key]} * {self.counter[key]} + "
         
         key = "bonus d'arrivee"
-        self.score += self.penalities[key] * self.counter[key]
-        explication += f"{self.penalities[key]} * {self.counter[key]} + "
+        self.score += Individue.PENALITES[key] * self.counter[key]
+        explication += f"{Individue.PENALITES[key]} * {self.counter[key]} + "
         
         key = "retour en arriere"
-        self.score += self.penalities[key] * self.counter[key]
-        explication += f"{self.penalities[key]} * {self.counter[key]} "
+        self.score += Individue.PENALITES[key] * self.counter[key]
+        explication += f"{Individue.PENALITES[key]} * {self.counter[key]} "
         
 
         explication += f"= {self.score}"

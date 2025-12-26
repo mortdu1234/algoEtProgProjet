@@ -16,15 +16,16 @@ def tests1():
     
 
     # parametres
-    Population.set_gardee(0.3)
+    Population.set_gardee(0.1)
     Population.set_generation(1000)
-    Population.set_individues(200)
+    Population.set_individues(20*20)
     Population.set_longueurs_max(20*20)
-    Population.set_mutation(0.5)
-    Individue.set_offset(0.05)
+    Population.set_mutation(0.9)
+    Individue.set_offset(0.10)
+    Individue.set_penalite(maze)
 
     population = Population(maze)
-    population.simulation(picture_each_x_generation=100)
+    population.simulation(picture_each_x_generation=10)
 
 
 
