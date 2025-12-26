@@ -1,5 +1,4 @@
 import time
-from unittest import result
 import matplotlib.pyplot as plt
 from Maze_maker import Maze
 
