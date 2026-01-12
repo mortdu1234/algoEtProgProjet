@@ -22,17 +22,18 @@ Ce projet implémente un **algorithme génétique** pour résoudre des labyrinth
 
 ```
 .
-├── MazeMaker.py                    # Génération et gestion des labyrinthes
-├── Genetique.py                    # Algorithme génétique (Population, Individue)
-├── Logs.py                         # Système de logs
-├── tests_genetique.py              # Script principal d'exécution
-├── tests_MazeMaker.py              # Tests de génération de labyrinthes
-├── tests_MazeMaker_EvaluationsEmpiriques.py  # Évaluations de performance
-├── logs/                           # Dossier des logs générés
-│   └── explorations/               # Visualisations par génération
-└── tests/                          # Dossier des résultats de tests
-    └── genetique/                  # Résultats des simulations génétiques
+├── MazeMaker.py                                # Génération et gestion des labyrinthes
+├── Genetique.py                                # Algorithme génétique (Population, Individue)
+├── Logs.py                                     # Système de logs
+├── tests_genetique.py                          # Script principal d'exécution
+├── tests_MazeMaker.py                          # Tests de génération de labyrinthes
+├── tests_MazeMaker_EvaluationsEmpiriques.py    # Évaluations de performance
+├── logs/                                       # Dossier des logs générés
+│   └── explorations/                           # Visualisations par génération
+└── tests/                                      # Dossier des résultats de tests
+    └── genetique/                              # Résultats des simulations génétiques
 ```
+Les différents dossier sont générés automatiquement s' ils sont manquant
 
 ## Installation
 
@@ -40,7 +41,6 @@ Ce projet implémente un **algorithme génétique** pour résoudre des labyrinth
 
 - Python 3.10.12
 - Bibliothèques requises :
-
 ```bash
 pip install -r requirement.txt
 ```
@@ -75,7 +75,6 @@ Population.set_mutation(0.9)             # Taux de mutation (90%)
 
 # Paramètres des individus
 Individue.set_offset(0.10)               # Offset pour le croisement (10%)
-Individue.set_penalite(maze)             # Configuration des pénalités
 ```
 
 ### Paramètres du labyrinthe

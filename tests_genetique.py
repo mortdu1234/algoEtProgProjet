@@ -56,7 +56,6 @@ def main():
     Population.set_longueurs_max(1000)
     Population.set_mutation(0.9)
     Individue.set_offset(0.10)
-    Individue.set_penalite(maze)
 
     population = Population(maze)
     score_min, score_max, score_avg , dist = population.simulation(picture_each_x_generation=1000)

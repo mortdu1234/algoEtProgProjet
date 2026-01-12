@@ -115,11 +115,11 @@ class Maze:
         self.pixels_map[x][y] = MazeColor.GOAL
 
         # set du départ
-        # réduit uniquement le x pour le choix du départ
+        # réduit uniquement le y pour le choix du départ
         x, y = self.size-1, self.size-1
         pixel_values = self.pixels_map[x][y]
         while pixel_values == MazeColor.WALL:
-            x -= 1
+            y -= 1
             pixel_values = self.pixels_map[x][y]  
         self.start_coords = (x, y)
         self.pixels_map[x][y] = MazeColor.START
@@ -166,7 +166,6 @@ class Maze:
                             # print(case, next_case)
                             if next_case == round(case - 1, 1):
                                 self.dimention_map[x][y] = idx
-
   
     def get_pixels(self, x: int, y: int) -> tuple[MazeColor, int, int]:
         """retourne la valeur du pixel x, y pour toutes les maps

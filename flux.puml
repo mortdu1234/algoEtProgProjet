@@ -1,0 +1,256 @@
+@startuml Algorithme Génétique
+skinparam activityBackgroundColor<<Selection>> Gold
+skinparam activityBackgroundColor<<Reproduction>> LightBlue
+skinparam activityBackgroundColor<<Mutation>> Orange
+skinparam activityBackgroundColor<<Fitness>> Plum
+skinparam activityBackgroundColor<<Pheromone>> LightYellow
+
+start
+
+partition "Initialisation" {
+  :Créer labyrinthe avec Maze(size);
+  note right
+    Génération procédurale
+    Application de Dijkstra
+  end note
+  
+  :Configurer paramètres génétiques;
+  note right
+    - Taux conservation: 2%
+    - Générations: 5000
+    - Population: 200
+    - Longueur max: 1000
+    - Taux mutation: 90%
+  end note
+  
+  :Créer population de N individus;
+  :Chaque individu = liste aléatoire\nde mouvements [0-7];
+}
+
+partition "Évaluation Initiale" #Plum {
+  :Calculer fitness de chaque individu;
+  :Trier par score croissant\n(meilleur = score le plus faible);
+}
+
+:generation = 0;
+
+while (generation < NOMBRE_GENERATION?) is (Oui)
+  
+  partition "Statistiques" {
+    :Noter score_min, score_max, score_avg;
+    :Calculer distance finale du meilleur;
+  }
+  
+  partition "SÉLECTION" #Gold {
+    :nb_gardes = population × TAUX_GARDEE;
+    :Conserver les nb_gardes meilleurs individus;
+    :Supprimer les autres;
+    note right
+      Exemple: garder top 2%
+      soit 4 sur 200
+    end note
+  }
+  
+  partition "REPRODUCTION" #LightBlue {
+    while (Population < NOMBRE_INDIVIDUES?) is (Oui)
+      :Choisir parent1 aléatoire;
+      :Choisir parent2 aléatoire;
+      
+      :pos_cut1 = milieu1 ± offset;
+      :pos_cut2 = milieu2 ± offset;
+      
+      :enfant = parent1[0:pos_cut1]\n+ parent2[pos_cut2:fin];
+      
+      if (longueur(enfant) > MAX?) then (Oui)
+        :Tronquer à LONGUEURS_MAX;
+      endif
+      
+      :Ajouter enfant à population;
+    endwhile (Non)
+  }
+  
+  partition "MUTATION" #Orange {
+    :nb_mutants = population × TAUX_GARDEE × TAUX_MUTATION;
+    
+    repeat
+      :Sélectionner individu aléatoire\n(après les gardés);
+      
+      :idx_mutation = aléatoire(0, longueur-1);
+      :nouvelle_valeur = aléatoire(0, 7);
+      :individu[idx_mutation] = nouvelle_valeur;
+      
+    repeat while (Tous mutants traités?) is (Non)
+    -> Oui;
+  }
+  
+  partition "Exploration et Phéromones" #LightYellow {
+    repeat
+      :Récupérer chemin de l'individu;
+      
+      repeat :case = (x, y) suivante du chemin;
+        :explored_map[x][y] += 1;
+        :explored_phase_map[x][y] += 1;
+        
+        if (Case = impasse?) then (Oui)
+          note right
+            Impasse = 1 seul voisin
+            non-mur disponible
+          end note
+          :pixels_map[x][y] = WALL;
+          :Remonter d'une case dans le chemin;
+        endif
+      repeat while (Autres cases?)
+      
+    repeat while (Autres individus?) is (Non)
+    -> Oui;
+  }
+  
+  partition "Calcul FITNESS" #Plum {
+    repeat
+      :Simuler le chemin de l'individu;
+      :Initialiser compteurs de pénalités;
+      
+      repeat :Exécuter mouvement suivant;
+        
+        if (Sortie de terrain?) then (Oui)
+          :compteur["sortie de terrain"]++;
+          :Rester sur place;
+        endif
+        
+        if (Collision avec mur?) then (Oui)
+          :compteur["foncer dans un mur"]++;
+          :Rester sur place;
+        endif
+        
+        if (Retour sur case visitée?) then (Oui)
+          :compteur["retour en arriere"]++;
+        endif
+        
+        if (Position = GOAL?) then (Oui)
+          :compteur["bonus d'arrivee"] = 1;
+        endif
+        
+        :Ajouter position au chemin visité;
+        
+      repeat while (Tous mouvements effectués?)
+      
+      :position_finale = dernière position;
+      :compteur["position final"] = dijkstra_map[position_finale];
+      
+      :score = position_finale³\n+ sorties_terrain × 1\n+ murs_heurtés × 1\n+ retours_arrière × 1\n+ bonus_arrivée × 0;
+      
+      note right
+        Score plus faible = meilleur
+        Distance finale au cube
+        pour pénaliser fortement
+        l'éloignement du but
+      end note
+      
+    repeat while (Tous individus notés?) is (Non)
+    -> Oui;
+  }
+  
+  :Trier individus par score croissant;
+  
+  if (generation % 1000 = 0?) then (Oui)
+    partition "Sauvegarde" {
+      :Générer carte d'exploration;
+      :Visualiser meilleur chemin;
+      :Fusionner les 2 figures;
+      :Sauvegarder image\nlogs/explorations/{gen}.png;
+      :Écrire logs détaillés;
+    }
+  endif
+  
+  :generation++;
+  
+endwhile (Non)
+
+partition "Résultats Finaux" {
+  :Générer courbes d'évolution\n(min, max, moyenne);
+  :Sauvegarder courbe de loss;
+  :Carte d'exploration complète;
+  :Afficher statistiques;
+  note right
+    - Temps total simulation
+    - Meilleur score atteint
+    - Longueur chemin optimal
+  end note
+}
+
+stop
+
+@enduml
+
+@startuml Génération du Labyrinthe
+skinparam activityBackgroundColor<<Init>> LightGreen
+skinparam activityBackgroundColor<<Dijkstra>> LightBlue
+skinparam activityBackgroundColor<<End>> LightPink
+
+start
+:Initialiser grille NxN avec MUR;
+:Choisir point de départ aléatoire (rx, ry);
+:Mettre PATH au point de départ;
+:Ajouter point à la pile;
+
+while (Pile non vide?) is (Oui)
+  :Prendre dernier point de la pile (x, y);
+  :Chercher voisins éligibles;
+  
+  if (Voisins éligibles trouvés?) then (Oui)
+    :Choisir voisin aléatoire (nx, ny);
+    :Mettre PATH au voisin;
+    :Ajouter voisin à la pile;
+  else (Non)
+    :Retirer point de la pile;
+  endif
+endwhile (Non)
+
+partition "Définition START et GOAL" {
+  :Trouver première case PATH en haut à gauche;
+  :Définir GOAL = (x, y);
+  :Trouver première case PATH en bas à droite;
+  :Définir START = (x, y);
+}
+
+partition "Algorithme de Dijkstra" #LightBlue {
+  :Initialiser distances à MAX pour toutes cases;
+  :Distance[GOAL] = 0;
+  :Ajouter GOAL à la file;
+  
+  while (File non vide?) is (Oui)
+    :Extraire case courante de la file;
+    
+    repeat
+      :Examiner voisin suivant;
+      
+      if (Voisin est PATH ET distance = MAX?) then (Oui)
+        :Distance[voisin] = distance[courante] + 1;
+        :Ajouter voisin à la file;
+      endif
+    repeat while (Autres voisins?)
+  endwhile (Non)
+}
+
+partition "Carte Dimensionnelle" #LightBlue {
+  :Pour chaque case (x, y) non-mur;
+  
+  repeat
+    :distance_courante = dijkstra_map[x][y];
+    
+    repeat
+      :Examiner voisin dans direction d;
+      
+      if (distance[voisin] = distance_courante - 1?) then (Oui)
+        :dimention_map[x][y] = d;
+        break;
+      endif
+    repeat while (Autres directions 0-7?)
+  repeat while (Autres cases?)
+}
+
+:Labyrinthe prêt avec:\n- pixels_map (murs/chemins)\n- dijkstra_map (distances)\n- dimention_map (directions optimales);
+
+stop
+
+@enduml

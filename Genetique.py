@@ -298,6 +298,12 @@ class Individue:
         Individue.CUT_OFFSET = offset
     @staticmethod
     def set_penalite(maze: 'Maze'):
+        """Fonction pour set les coefficient de pénalité afin de tester quels peuvent etre les meilleures
+        <ne pas utiliser>
+
+        Args:
+            maze (Maze): _description_
+        """
         Individue.PENALITES = {
             "sortie de terrain": 1,
             "foncer dans un mur": 1,
