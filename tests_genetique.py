@@ -39,26 +39,27 @@ def main():
     clear_exploration()
     os.makedirs("tests", exist_ok=True)
     os.makedirs("tests/genetique", exist_ok=True)
+    os.makedirs("tests/genetique/param", exist_ok=True)
     show = False
     value = True
-    maze = Maze(20)
+    maze = Maze(50)
     
 
 
     fig = maze.get_fig_pixel_map(title="", show_image=show)
     fig.savefig("tests/genetique/init.png")
-    
 
     # parametres
     Population.set_gardee(0.02)
-    Population.set_generation(5000)
-    Population.set_individues(200)
-    Population.set_longueurs_max(1000)
+    Population.set_generation(1000)
+    Population.set_individues(500)
+    Population.set_longueurs_max(500)
     Population.set_mutation(0.9)
     Individue.set_offset(0.10)
 
     population = Population(maze)
-    score_min, score_max, score_avg , dist = population.simulation(picture_each_x_generation=1000)
+
+    score_min, score_max, score_avg , dist = population.simulation(picture_each_x_generation=10)
     plot_3_curves_save(score_min, score_max, score_avg, "tests/genetique/param/c1.png")
     print(dist)
     courbe_loss(score_min, "tests/genetique/param/loss.png")

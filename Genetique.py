@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import time
 import numpy as np
 import os
+import math
 from Logs import Logs
 os.makedirs("logs/explorations", exist_ok=True)
 
@@ -153,6 +154,8 @@ class Population:
         for _ in range(Population.NOMBRE_INDIVIDUES):
             individue: Individue = Individue([rdm(0, 7) for _ in range(Population.LONGUEURS_MAX)], maze.start_coords)
             self.individues.append(individue)
+        print(f"Population initiale de {len(self.individues)} individues créée.")
+
 
 
     def __str__(self):
@@ -170,10 +173,10 @@ class Population:
         self.distances.append(self.maze.dijkstra_map[coords_final[0]][coords_final[1]])
 
     def simulation(self, picture_each_x_generation=10):
+        print("Début de la simulation génétique...")
 
         self.calcul_fitness()
         self.tri_individue()
-        print("Début de la simulation génétique...")
         s2 = time.perf_counter()
         cpt = 0
         for i in range(Population.NOMBRE_GENERATION):
@@ -231,7 +234,7 @@ class Population:
         self.individues.sort(key=lambda ind: ind.score) # type: ignore
 
     def selection(self):
-        nombre: int = round(Population.NOMBRE_INDIVIDUES * Population.TAUX_GARDEE)
+        nombre: int = math.ceil(Population.NOMBRE_INDIVIDUES * Population.TAUX_GARDEE)
         self.individues = self.individues[:nombre]
 
     def reproduction(self):
@@ -250,15 +253,15 @@ class Population:
                 self.maze.add_exploration(x, y)
     
     def mutation(self):
-        nb_mutant = round(Population.NOMBRE_INDIVIDUES * Population.TAUX_GARDEE * Population.TAUX_MUTATION) # nombre de mutant
+        nb_mutant = math.ceil(Population.NOMBRE_INDIVIDUES * Population.TAUX_GARDEE * Population.TAUX_MUTATION) # nombre de mutant
         nb_mutation = 1 # nombre de mutation par mutant
         idx_mutants = []
 
         for _ in range(nb_mutant):
             # selection du mutant
-            idx_mutant = random.randint(round(Population.NOMBRE_INDIVIDUES * Population.TAUX_GARDEE), Population.NOMBRE_INDIVIDUES-1)
+            idx_mutant = random.randint(math.ceil(Population.NOMBRE_INDIVIDUES * Population.TAUX_GARDEE), Population.NOMBRE_INDIVIDUES-1)
             while idx_mutant in idx_mutants:
-                idx_mutant = random.randint(round(Population.NOMBRE_INDIVIDUES * Population.TAUX_GARDEE), Population.NOMBRE_INDIVIDUES-1)
+                idx_mutant = random.randint(math.ceil(Population.NOMBRE_INDIVIDUES * Population.TAUX_GARDEE), Population.NOMBRE_INDIVIDUES-1)
                 # print(idx_mutant, idx_mutants)
             idx_mutants.append(idx_mutant)
             mutant : Individue = self.individues[idx_mutant]
@@ -442,12 +445,12 @@ class Individue:
     @staticmethod
     def fusion(individue1: 'Individue', individue2: 'Individue'):
         longueur1 = len(individue1.mouvements)
-        offset1 = round(longueur1*Individue.CUT_OFFSET)
+        offset1 = math.ceil(longueur1*Individue.CUT_OFFSET)
         milieu1 = longueur1//2
         pos_cut1 = random.randint(milieu1-offset1, milieu1+offset1)
 
         longueur2 = len(individue2.mouvements)
-        offset2 = round(longueur2*Individue.CUT_OFFSET)
+        offset2 = math.ceil(longueur2*Individue.CUT_OFFSET)
         milieu2 = longueur2//2
         pos_cut2 = random.randint(milieu2-offset2, milieu2+offset2)
 

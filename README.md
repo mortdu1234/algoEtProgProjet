@@ -31,7 +31,9 @@ Ce projet implémente un **algorithme génétique** pour résoudre des labyrinth
 ├── logs/                                       # Dossier des logs générés
 │   └── explorations/                           # Visualisations par génération
 └── tests/                                      # Dossier des résultats de tests
-    └── genetique/                              # Résultats des simulations génétiques
+    ├── genetique/                              # Résultats des simulations génétiques
+    └── hyperparametres/                        # Résultats des tests des hyperparametres
+
 ```
 Les différents dossier sont générés automatiquement s' ils sont manquant
 
